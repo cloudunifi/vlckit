@@ -25,12 +25,19 @@ Reproduced with a Matroska file (H.264 1080p at about 7 Mbps, AAC, one text subt
 cues 0.5 to 3 s apart) over HTTP from a server delivering well above the stream's bitrate, through
 libvlc 4 with `:demux=avformat` and `:network-caching=10000`:
 
+Measured 2026-10-31 with VideoLAN's VLCKit nightly of 2026-08-31 (VLC `fd814768b` plus VLCKit's
+twelve patches) against the same build plus this patch, 600 s each, same file, same server, ten
+minutes apart:
+
 | | before | after |
 |---|---|---|
-| `clock gap, unexpected stream discontinuity` lines, first 600 s | (fill in from the harness) | (fill in) |
-| `fifo full … resetting fifo` resets, first 600 s | (fill in) | (fill in) |
-| pictures lost | (fill in) | (fill in) |
-| bytes read ahead of bytes played at 600 s | (fill in) | (fill in) |
+| `clock gap, unexpected stream discontinuity` lines | 1,410 | 0 |
+| `ES_OUT_SET_PCR … late` and `ES_OUT_RESET_PCR` lines | 32 | 0 |
+| `fifo full … resetting fifo` resets | 1 | 0 |
+| picture freezes / clock jumps seen by the harness | 3 / 5 | 0 / 0 |
+| pictures lost | 158 | 0 |
+| bytes read in 600 s (the stream plays about 500 MiB in that time) | 1,211 MiB | 475 MiB |
+| input rate at 600 s | edge speed | 288 KiB/s, the stream's own rate |
 
 libvlc's own Matroska demuxer, which does not count the subtitle track in its PCR, plays the same
 file with zero clock gaps and read-ahead bounded at about 17 MiB, which is the behaviour this change
