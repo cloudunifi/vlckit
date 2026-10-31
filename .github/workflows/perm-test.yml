@@ -7,18 +7,19 @@ jobs:
     permissions:
       contents: write
     steps:
-      - name: Published release, with and without target_commitish
+      - uses: actions/checkout@v4
+      - name: CLI create (full stderr), API create plus CLI upload
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set +e
-          echo "--- A: published, no target ---"
-          gh api -X POST repos/$GITHUB_REPOSITORY/releases -f tag_name=perm-a-$GITHUB_RUN_ID -f name=perm-a -F draft=false 2>&1 | grep -oE '"id":[0-9]+|HTTP [0-9]+.*|message[^,]*' | head -2
-          echo "--- B: published, target sha ---"
-          gh api -X POST repos/$GITHUB_REPOSITORY/releases -f tag_name=perm-b-$GITHUB_RUN_ID -f target_commitish=$GITHUB_SHA -f name=perm-b -F draft=false 2>&1 | grep -oE '"id":[0-9]+|HTTP [0-9]+.*|message[^,]*' | head -2
-          echo "--- C: gh release create, target sha ---"
-          gh release create perm-c-$GITHUB_RUN_ID --target "$GITHUB_SHA" --title perm-c --notes "probe" 2>&1 | tail -1
-          echo "--- D: gh release create, no target ---"
-          gh release create perm-d-$GITHUB_RUN_ID --title perm-d --notes "probe" 2>&1 | tail -1
+          gh --version | head -1
+          echo "--- C: gh release create with checkout ---"
+          gh release create perm-c-$GITHUB_RUN_ID --target "$GITHUB_SHA" --title perm-c --notes "probe"; echo "exit=$?"
+          echo "--- E: gh api create published, then gh release upload ---"
+          gh api -X POST repos/$GITHUB_REPOSITORY/releases -f tag_name=perm-e-$GITHUB_RUN_ID -f target_commitish=$GITHUB_SHA -f name=perm-e -f body=probe -F draft=false --jq '.id'
+          echo "probe asset" > asset.txt
+          gh release upload perm-e-$GITHUB_RUN_ID asset.txt --clobber; echo "upload exit=$?"
+          gh release view perm-e-$GITHUB_RUN_ID --json assets --jq '.assets[].name'
           echo "--- cleanup ---"
-          for t in perm-a perm-b perm-c perm-d; do gh release delete $t-$GITHUB_RUN_ID --yes --cleanup-tag 2>&1 | tail -1; done
+          for t in perm-c perm-e; do gh release delete $t-$GITHUB_RUN_ID --yes --cleanup-tag; echo "delete $t exit=$?"; done
