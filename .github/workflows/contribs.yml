@@ -54,7 +54,10 @@ jobs:
           HASH=$(sed -n 's/^TESTEDHASH="\([0-9a-f]*\)".*/\1/p' compileAndBuildVLCKit.sh)
           TAG="contribs-$HASH"
           ls -la packages
-          gh release view "$TAG" >/dev/null 2>&1 || gh release create "$TAG" --target "$GITHUB_SHA" \
-            --title "VLC contribs for $HASH" \
-            --notes "Prebuilt contribs for VLC $HASH, built by the contribs workflow from the pinned sources. One asset per platform; the build workflow fetches them through VLCKIT_PREBUILT_CONTRIBS_URL_TEMPLATE."
+          NOTES="Prebuilt contribs for VLC $HASH, built by the contribs workflow from the pinned sources. One asset per platform; the build workflow fetches them through VLCKIT_PREBUILT_CONTRIBS_URL_TEMPLATE."
+          # The CLI call once got "HTTP 403: Resource not accessible by integration" minutes after the
+          # repository was created, while the same request through gh api succeeded; keep both.
+          gh release view "$TAG" >/dev/null 2>&1 \
+            || gh release create "$TAG" --target "$GITHUB_SHA" --title "VLC contribs for $HASH" --notes "$NOTES" \
+            || gh api -X POST "repos/$GITHUB_REPOSITORY/releases" -f tag_name="$TAG" -f target_commitish="$GITHUB_SHA" -f name="VLC contribs for $HASH" -f body="$NOTES" -F draft=false --jq .html_url
           gh release upload "$TAG" packages/*.tar.zst --clobber

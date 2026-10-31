@@ -86,8 +86,12 @@ jobs:
           mv VLCKit-REPLACEWITHVERSION.zip "$ZIP"
           SUM=$(swift package compute-checksum "$ZIP")
           TAG="vlckit-$STAMP-$VLC-$FORK"
-          gh release create "$TAG" --target "$GITHUB_SHA" --title "$ZIP" \
-            --notes "VLCKit.xcframework (iOS, tvOS, macOS; arm64 device and simulator) from VLC $VLC with this repository's patches at $FORK. SwiftPM checksum $SUM." "$ZIP"
+          NOTES="VLCKit.xcframework (iOS, tvOS, macOS; arm64 device and simulator) from VLC $VLC with this repository's patches at $FORK. SwiftPM checksum $SUM."
+          # Create first, upload second, so a CLI refusal (seen once as HTTP 403 right after the
+          # repository was created) falls back to the raw API and the upload still happens.
+          gh release create "$TAG" --target "$GITHUB_SHA" --title "$ZIP" --notes "$NOTES" \
+            || gh api -X POST "repos/$GITHUB_REPOSITORY/releases" -f tag_name="$TAG" -f target_commitish="$GITHUB_SHA" -f name="$ZIP" -f body="$NOTES" -F draft=false --jq .html_url
+          gh release upload "$TAG" "$ZIP" --clobber
           URL="https://github.com/$GITHUB_REPOSITORY/releases/download/$TAG/$ZIP"
           perl -i -pe 's#url: ".*"#url: "'"$URL"'"#; s#checksum: ".*"#checksum: "'"$SUM"'"#' Package.swift
           git config user.name "github-actions[bot]"
