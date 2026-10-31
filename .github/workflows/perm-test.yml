@@ -7,14 +7,18 @@ jobs:
     permissions:
       contents: write
     steps:
-      - name: Try a draft release with the job token
+      - name: Published release, with and without target_commitish
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set +e
-          echo "--- tag ref create ---"
-          gh api -X POST repos/$GITHUB_REPOSITORY/git/refs -f ref=refs/tags/perm-test-$GITHUB_RUN_ID -f sha=$GITHUB_SHA 2>&1 | tail -3
-          echo "--- draft release create ---"
-          gh api -X POST repos/$GITHUB_REPOSITORY/releases -f tag_name=perm-test-$GITHUB_RUN_ID -f name=perm-test -F draft=true 2>&1 | tail -3
+          echo "--- A: published, no target ---"
+          gh api -X POST repos/$GITHUB_REPOSITORY/releases -f tag_name=perm-a-$GITHUB_RUN_ID -f name=perm-a -F draft=false 2>&1 | grep -oE '"id":[0-9]+|HTTP [0-9]+.*|message[^,]*' | head -2
+          echo "--- B: published, target sha ---"
+          gh api -X POST repos/$GITHUB_REPOSITORY/releases -f tag_name=perm-b-$GITHUB_RUN_ID -f target_commitish=$GITHUB_SHA -f name=perm-b -F draft=false 2>&1 | grep -oE '"id":[0-9]+|HTTP [0-9]+.*|message[^,]*' | head -2
+          echo "--- C: gh release create, target sha ---"
+          gh release create perm-c-$GITHUB_RUN_ID --target "$GITHUB_SHA" --title perm-c --notes "probe" 2>&1 | tail -1
+          echo "--- D: gh release create, no target ---"
+          gh release create perm-d-$GITHUB_RUN_ID --title perm-d --notes "probe" 2>&1 | tail -1
           echo "--- cleanup ---"
-          gh api -X DELETE repos/$GITHUB_REPOSITORY/git/refs/tags/perm-test-$GITHUB_RUN_ID 2>&1 | tail -1
+          for t in perm-a perm-b perm-c perm-d; do gh release delete $t-$GITHUB_RUN_ID --yes --cleanup-tag 2>&1 | tail -1; done
