@@ -140,6 +140,10 @@ buildxcodeproj()
     else
         architectures=`get_actual_arch $FARCH`
     fi
+    # cloudunifi/vlckit: arm64-only simulator and macOS archives (no x86_64 libvlc was built).
+    if [ "$VLCKIT_ARM64_ONLY" = "yes" ]; then
+        architectures="arm64"
+    fi
 
     local bitcodeflag=""
     if [ "$IOS" = "yes" ]; then
@@ -216,7 +220,16 @@ buildLibVLC() {
     mkdir -p ${BUILDDIR}
     spushd ${BUILDDIR}
 
-    ../extras/package/apple/build.sh --arch=$ARCH --sdk=${PLATFORM}${SDK_VERSION} ${DEBUGFLAG} ${VERBOSEFLAG} ${BITCODEFLAG} ${MAKEFLAGS}
+    # cloudunifi/vlckit: prebuilt contribs per platform. VLC names every arm64 Apple host
+    # aarch64-apple-darwin, so the asset name carries the platform and arch instead.
+    PREBUILTFLAG=""
+    if [ -n "${VLCKIT_PREBUILT_CONTRIBS_URL_TEMPLATE}" ]; then
+        VLC_PREBUILT_CONTRIBS_URL=$(printf '%s' "${VLCKIT_PREBUILT_CONTRIBS_URL_TEMPLATE}" | sed "s/{platform}/${PLATFORM}/g; s/{arch}/${ACTUAL_ARCH}/g")
+        export VLC_PREBUILT_CONTRIBS_URL
+        PREBUILTFLAG="--with-prebuilt-contribs"
+        info "Prebuilt contribs from ${VLC_PREBUILT_CONTRIBS_URL}"
+    fi
+    ../extras/package/apple/build.sh --arch=$ARCH --sdk=${PLATFORM}${SDK_VERSION} ${DEBUGFLAG} ${VERBOSEFLAG} ${BITCODEFLAG} ${PREBUILTFLAG} ${MAKEFLAGS}
 
     spopd # builddir
 
@@ -230,7 +243,7 @@ buildMobileKit() {
         if [ "$FARCH" = "all" ];then
             if [ "$TVOS" = "yes" ]; then
                 if [ "$PLATFORM" = "iphonesimulator" ]; then
-                    buildLibVLC "x86_64" "appletvsimulator"
+                    [ "$VLCKIT_ARM64_ONLY" = "yes" ] || buildLibVLC "x86_64" "appletvsimulator"
                     buildLibVLC "aarch64" "appletvsimulator"
                 else
                     buildLibVLC "aarch64" "appletvos"
@@ -238,7 +251,7 @@ buildMobileKit() {
             fi
             if [ "$MACOS" = "yes" ]; then
                 buildLibVLC "aarch64" "macosx"
-                buildLibVLC "x86_64" "macosx"
+                [ "$VLCKIT_ARM64_ONLY" = "yes" ] || buildLibVLC "x86_64" "macosx"
             fi
             if [ "$XROS" = "yes" ]; then
                 info "building for xrOS"
@@ -255,7 +268,7 @@ buildMobileKit() {
             fi
             if [ "$IOS" = "yes" ]; then
                 if [ "$PLATFORM" = "iphonesimulator" ]; then
-                    buildLibVLC "x86_64" $PLATFORM
+                    [ "$VLCKIT_ARM64_ONLY" = "yes" ] || buildLibVLC "x86_64" $PLATFORM
                     buildLibVLC "aarch64" $PLATFORM
                 else
                     if [ "$INCLUDE_ARMV7" = "yes" ]; then

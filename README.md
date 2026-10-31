@@ -1,3 +1,28 @@
+# cloudunifi/vlckit
+
+A fork of [VLCKit](https://code.videolan.org/videolan/VLCKit) that Shelf and Gameday link instead of
+VideoLAN's nightly binary. It differs from upstream in one libvlc change and in how it is built:
+
+- `libvlc/patches/0013-demux-avformat-keep-subtitle-tracks-out-of-the-PCR.patch`: the avformat
+  demuxer no longer lets a sparse subtitle track drive the stream clock, so the core paces the demuxer
+  and read-ahead stays bounded. Submitted upstream; see `docs/UPSTREAM.md`.
+- `ci/contribs.sh` and `.github/workflows/contribs.yml` build VLC's contribs once per pinned VLC commit
+  and publish them as assets of release `contribs-<hash>`.
+- `.github/workflows/build.yml` builds iOS, tvOS and macOS (arm64 only) on every push to `shelf`,
+  packages one `VLCKit.xcframework`, publishes it as a release and commits the URL and checksum into
+  `Package.swift`.
+- `compileAndBuildVLCKit.sh` has two env-guarded additions, `VLCKIT_PREBUILT_CONTRIBS_URL_TEMPLATE`
+  and `VLCKIT_ARM64_ONLY`; without them it behaves as upstream.
+
+VLCKit and libvlc are LGPL 2.1 (`COPYING`). This repository is the corresponding source for the
+binaries on its releases page.
+
+**Bumping VLC:** merge upstream `master` into `shelf` (`git merge upstream/master`), check that the
+thirteen patches still apply, run the `contribs` workflow by hand, push, let `build` publish, then
+pin the new `shelf` commit in the app's `App/project.yml` and `App/Package.resolved`.
+
+---
+
 <img src="https://www.videolan.org/images/vlckit/logo.svg" alt="VLCKit logo" height="140">
 
 #
