@@ -10,6 +10,7 @@ on:
 
 env:
   VLCKIT_ARM64_ONLY: "yes"
+  VLC_PATH: /opt/homebrew/opt/make/libexec/gnubin:/opt/homebrew/bin
 
 jobs:
   framework:
@@ -27,7 +28,10 @@ jobs:
       - name: Xcode 26.6
         run: sudo xcode-select -s /Applications/Xcode_26.6.app && xcodebuild -version
       - name: Tools
-        run: brew install automake autoconf libtool pkg-config nasm meson ninja gettext zstd
+        # Apple's /usr/bin/make is GNU make 3.81, whose jobserver breaks under VLC's jobserver-aware
+        # ninja ("read jobs pipe: Resource temporarily unavailable"). VLC_PATH goes first on PATH in
+        # compileAndBuildVLCKit.sh, so Homebrew's make 4 wins there.
+        run: brew install make automake autoconf libtool pkg-config nasm meson ninja gettext zstd && /opt/homebrew/opt/make/libexec/gnubin/make --version | head -1
       - name: Build VLCKit for ${{ matrix.platform }}
         run: |
           set -eu
