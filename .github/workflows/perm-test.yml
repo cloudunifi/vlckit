@@ -1,0 +1,20 @@
+name: perm-test
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Try a draft release with the job token
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set +e
+          echo "--- tag ref create ---"
+          gh api -X POST repos/$GITHUB_REPOSITORY/git/refs -f ref=refs/tags/perm-test-$GITHUB_RUN_ID -f sha=$GITHUB_SHA 2>&1 | tail -3
+          echo "--- draft release create ---"
+          gh api -X POST repos/$GITHUB_REPOSITORY/releases -f tag_name=perm-test-$GITHUB_RUN_ID -f name=perm-test -F draft=true 2>&1 | tail -3
+          echo "--- cleanup ---"
+          gh api -X DELETE repos/$GITHUB_REPOSITORY/git/refs/tags/perm-test-$GITHUB_RUN_ID 2>&1 | tail -1
