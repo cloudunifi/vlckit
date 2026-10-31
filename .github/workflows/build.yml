@@ -1,0 +1,93 @@
+name: build
+
+# Every push to shelf: three platform jobs (device + simulator, arm64 only) using the prebuilt
+# contribs, then one package job that publishes VLCKit.xcframework and commits Package.swift.
+on:
+  push:
+    branches: [shelf]
+    paths-ignore: [Package.swift, README.md, docs/**]
+  workflow_dispatch:
+
+env:
+  VLCKIT_ARM64_ONLY: "yes"
+
+jobs:
+  framework:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { platform: iOS,   flags: "-f" }
+          - { platform: tvOS,  flags: "-ft" }
+          - { platform: macOS, flags: "-x" }
+    runs-on: macos-26
+    timeout-minutes: 240
+    steps:
+      - uses: actions/checkout@v4
+      - name: Xcode 26.6
+        run: sudo xcode-select -s /Applications/Xcode_26.6.app && xcodebuild -version
+      - name: Tools
+        run: brew install automake autoconf libtool pkg-config nasm meson ninja gettext zstd
+      - name: Build VLCKit for ${{ matrix.platform }}
+        run: |
+          set -eu
+          HASH=$(sed -n 's/^TESTEDHASH="\([0-9a-f]*\)".*/\1/p' compileAndBuildVLCKit.sh)
+          export VLCKIT_PREBUILT_CONTRIBS_URL_TEMPLATE="https://github.com/$GITHUB_REPOSITORY/releases/download/contribs-$HASH/vlc-contrib-{platform}-{arch}.tar.zst"
+          ./compileAndBuildVLCKit.sh ${{ matrix.flags }} -r
+          ls build
+      - name: Pack the archives (keeps the frameworks' symlinks)
+        run: tar -C build -czf archives-${{ matrix.platform }}.tgz $(cd build && ls -d VLCKit-*.xcarchive)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: archives-${{ matrix.platform }}
+          path: archives-${{ matrix.platform }}.tgz
+          retention-days: 3
+          if-no-files-found: error
+
+  package:
+    needs: framework
+    runs-on: macos-26
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: shelf
+      - name: Xcode 26.6
+        run: sudo xcode-select -s /Applications/Xcode_26.6.app
+      - uses: actions/download-artifact@v4
+        with:
+          path: archives
+          merge-multiple: true
+      - name: Unpack the five archives into build/
+        run: |
+          set -eu
+          mkdir -p build
+          for t in archives/*.tgz; do tar -C build -xzf "$t"; done
+          ls build
+      - name: One xcframework, SwiftPM zip
+        run: |
+          set -eu
+          ./Packaging/create-distributable-package.sh -a -x -m -t -s
+          ls -la *.zip
+      - name: Release and Package.swift
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -eu
+          VLC=$(sed -n 's/^TESTEDHASH="\([0-9a-f]*\)".*/\1/p' compileAndBuildVLCKit.sh)
+          FORK=$(git rev-parse --short=7 HEAD)
+          STAMP=$(date -u +%Y%m%d-%H%M)
+          ZIP="VLCKit-4.0-$STAMP-$VLC-$FORK.zip"
+          mv VLCKit-REPLACEWITHVERSION.zip "$ZIP"
+          SUM=$(swift package compute-checksum "$ZIP")
+          TAG="vlckit-$STAMP-$VLC-$FORK"
+          gh release create "$TAG" --target "$GITHUB_SHA" --title "$ZIP" \
+            --notes "VLCKit.xcframework (iOS, tvOS, macOS; arm64 device and simulator) from VLC $VLC with this repository's patches at $FORK. SwiftPM checksum $SUM." "$ZIP"
+          URL="https://github.com/$GITHUB_REPOSITORY/releases/download/$TAG/$ZIP"
+          perl -i -pe 's#url: ".*"#url: "'"$URL"'"#; s#checksum: ".*"#checksum: "'"$SUM"'"#' Package.swift
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Package.swift
+          git commit -m "Package.swift: $ZIP" -m "checksum $SUM"
+          git push origin HEAD:shelf

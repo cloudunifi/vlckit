@@ -1,0 +1,54 @@
+name: contribs
+
+# Once per pinned VLC commit: build each target's contribs from source and publish them as assets of
+# release contribs-<TESTEDHASH>, which the build workflow fetches. Run by hand.
+on:
+  workflow_dispatch:
+
+jobs:
+  contribs:
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [iphoneos, iphonesimulator, appletvos, appletvsimulator, macosx]
+    runs-on: macos-26
+    timeout-minutes: 355
+    steps:
+      - uses: actions/checkout@v4
+      - name: Xcode 26.6
+        run: sudo xcode-select -s /Applications/Xcode_26.6.app && xcodebuild -version
+      - name: Tools
+        run: brew install automake autoconf libtool pkg-config nasm meson ninja gettext zstd
+      - name: Build and package contribs
+        run: ci/contribs.sh ${{ matrix.platform }} aarch64
+      - uses: actions/upload-artifact@v4
+        with:
+          name: vlc-contrib-${{ matrix.platform }}-arm64
+          path: contrib-packages/*.tar.zst
+          retention-days: 7
+          if-no-files-found: error
+
+  release:
+    needs: contribs
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: packages
+          merge-multiple: true
+      - name: Publish the assets on release contribs-<hash>
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -eu
+          HASH=$(sed -n 's/^TESTEDHASH="\([0-9a-f]*\)".*/\1/p' compileAndBuildVLCKit.sh)
+          TAG="contribs-$HASH"
+          ls -la packages
+          gh release view "$TAG" >/dev/null 2>&1 || gh release create "$TAG" --target "$GITHUB_SHA" \
+            --title "VLC contribs for $HASH" \
+            --notes "Prebuilt contribs for VLC $HASH, built by the contribs workflow from the pinned sources. One asset per platform; the build workflow fetches them through VLCKIT_PREBUILT_CONTRIBS_URL_TEMPLATE."
+          gh release upload "$TAG" packages/*.tar.zst --clobber
