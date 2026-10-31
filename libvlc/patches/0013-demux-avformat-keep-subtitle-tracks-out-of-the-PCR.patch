@@ -1,0 +1,57 @@
+From 840f1a25b07d8d5ad11bc06c243792ed3317a328 Mon Sep 17 00:00:00 2001
+From: Dave Horsey <dave@cloudunifi.com>
+Date: Sat, 31 Oct 2026 13:01:55 -0400
+Subject: [PATCH] demux: avformat: keep subtitle tracks out of the PCR
+
+A sparse subtitle track's last timestamp lags the audio and video by up
+to several seconds and jumps forward with each cue. Taking the PCR as the
+minimum over such a track pins the clock to the last cue and advances it
+in steps larger than CR_MAX_GAP, which the core reads as a discontinuity
+on every cue and re-bases, so the demuxer is never paced: on a fast HTTP
+source the video decoder's fifo fills to its cap and is reset (observed
+as the picture minutes ahead of the sound). Leave SPU tracks out of the
+minimum and the maximum whenever an audio or video track has an ES; a
+subtitle-only input keeps the previous behaviour.
+---
+ modules/demux/avformat/demux.c | 15 ++++++++++++++-
+ 1 file changed, 14 insertions(+), 1 deletion(-)
+
+diff --git a/modules/demux/avformat/demux.c b/modules/demux/avformat/demux.c
+index 0a4cfbd..3b37b8a 100644
+--- a/modules/demux/avformat/demux.c
++++ b/modules/demux/avformat/demux.c
+@@ -974,10 +974,22 @@ static int Demux( demux_t *p_demux )
+     if( p_frame->i_dts != VLC_TICK_INVALID && p_track->p_es != NULL )
+         p_track->i_pcr = p_frame->i_dts;
+ 
++    /* A sparse track (subtitles) lags the others by up to several seconds and
++     * advances in jumps; letting it drive the PCR pins the clock to its last
++     * cue and makes every cue look like a discontinuity to the core, which
++     * then never paces the demuxer. Leave SPU tracks out while an audio or
++     * video track has an ES. */
++    bool b_av_tracks = false;
++    for( unsigned i = 0; i < p_sys->i_tracks; i++ )
++        if( p_sys->tracks[i].p_es != NULL &&
++            p_sys->tracks[i].es_format.i_cat != SPU_ES )
++            b_av_tracks = true;
++
+     vlc_tick_t i_ts_max = VLC_TICK_MIN;
+     for( unsigned i = 0; i < p_sys->i_tracks; i++ )
+     {
+-        if( p_sys->tracks[i].p_es != NULL )
++        if( p_sys->tracks[i].p_es != NULL &&
++            !( b_av_tracks && p_sys->tracks[i].es_format.i_cat == SPU_ES ) )
+             i_ts_max = __MAX( i_ts_max, p_sys->tracks[i].i_pcr );
+     }
+ 
+@@ -985,6 +997,7 @@ static int Demux( demux_t *p_demux )
+     for( unsigned i = 0; i < p_sys->i_tracks; i++ )
+     {
+         if( p_sys->tracks[i].p_es != NULL &&
++                !( b_av_tracks && p_sys->tracks[i].es_format.i_cat == SPU_ES ) &&
+                 p_sys->tracks[i].i_pcr != VLC_TICK_INVALID &&
+                 p_sys->tracks[i].i_pcr + VLC_TICK_FROM_SEC(10)>= i_ts_max )
+             i_ts_min = __MIN( i_ts_min, p_sys->tracks[i].i_pcr );
+-- 
+2.54.0 (Apple Git-157)
+
