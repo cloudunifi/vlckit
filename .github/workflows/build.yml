@@ -39,8 +39,10 @@ jobs:
           export VLCKIT_PREBUILT_CONTRIBS_URL_TEMPLATE="https://github.com/$GITHUB_REPOSITORY/releases/download/contribs-$HASH/vlc-contrib-{platform}-{arch}.tar.zst"
           ./compileAndBuildVLCKit.sh ${{ matrix.flags }} -r
           ls build
-      - name: Pack the archives (keeps the frameworks' symlinks)
-        run: tar -C build -czf archives-${{ matrix.platform }}.tgz $(cd build && ls -d VLCKit-*.xcarchive)
+      - name: Pack the archives and the platform xcframework (keeps the frameworks' symlinks)
+        # The packaging script looks for build/<platform>/VLCKit.xcframework and rebuilds the platform
+        # from scratch if it is missing, so the per-platform xcframework travels with the archives.
+        run: tar -C build -czf archives-${{ matrix.platform }}.tgz $(cd build && ls -d VLCKit-*.xcarchive) ${{ matrix.platform }}
       - uses: actions/upload-artifact@v4
         with:
           name: archives-${{ matrix.platform }}
@@ -63,12 +65,13 @@ jobs:
         with:
           path: archives
           merge-multiple: true
-      - name: Unpack the five archives into build/
+      - name: Unpack the five archives and three platform xcframeworks into build/
         run: |
           set -eu
           mkdir -p build
           for t in archives/*.tgz; do tar -C build -xzf "$t"; done
           ls build
+          for d in iOS tvOS macOS; do test -d "build/$d/VLCKit.xcframework" || { echo "missing build/$d/VLCKit.xcframework" >&2; exit 1; }; done
       - name: One xcframework, SwiftPM zip
         run: |
           set -eu
