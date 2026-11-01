@@ -59,9 +59,12 @@ give the track list.
    (`modules/demux/avformat/demux.c` is identical at both; checked against master `c783406` of
    2026-10-19 on 2026-11-01). The VLC checkout at `~/github/vlckit-scratch/vlc` has branch
    `avformat-spu-pcr` = `upstream/master` + the commit, authored `Dave Horsey <dave@cloudunifi.com>`.
-2. Account: https://code.videolan.org/users/sign_in offers "Sign in with GitHub" (also GitLab.com
-   and plain registration). Sign in with the `cloudunifi` GitHub account and accept the GitLab
-   username it proposes.
+2. Account: register natively at https://code.videolan.org/users/sign_up (name, username, email,
+   password, captcha), then confirm the email. The "Sign in with GitHub" button refuses an
+   account that does not already exist ("Create an account in code.videolan.org first, and then
+   connect it to your GitHub account", seen 2026-11-01); link GitHub afterwards under
+   Preferences → Account → Connected accounts if wanted. If the new account sits at "pending
+   approval", mail videolan at videolan.org as the sign-up page says.
 3. Fork https://code.videolan.org/videolan/vlc with the Fork button (personal fork:
    `code.videolan.org/<username>/vlc`). Add an SSH key under Preferences → SSH Keys, or use HTTPS
    with a personal access token (Preferences → Access Tokens, scope `write_repository`).
