@@ -45,13 +45,37 @@ gives the avformat demuxer.
 
 ## Evidence to attach
 
-- The two harness outputs (`.out`) and the two libvlc logs with the stream address redacted
-  (`tools/vlc-harness` in the app repository redacts it).
-- `ffprobe -show_streams` of the file (codec, time base and cue spacing of the subtitle track).
+Prepared on the Mac mini in the session scratchpad (`…/scratchpad/vlc-mr/`; regenerate from
+`tools/vlc-harness` in the app repository if gone): the two harness outputs and the two libvlc
+logs, 600 s each. The harness redacts the stream path; the copies also replace the provider's
+host with `provider.example` (check with `grep -c trxdnscloud` before attaching: must be 0).
+`MR.md` in the same directory holds the title and body above. No ffprobe on the Mac; the libvlc
+logs' `adding es` lines (`video codec = h264`, `audio codec = mp4a`, `subtitle codec = undf`)
+give the track list.
 
 ## Steps
 
-1. `git format-patch` is already done: `libvlc/patches/0013-…patch` applies to `fd814768b` and to
-   `master` (the file is identical, checked 2026-10-31).
-2. Push a branch to a fork on code.videolan.org, open the MR with the text above, label `Demux`.
-3. Note the MR link here and in the app repository's follow-ups (item 24).
+1. The patch is ready: `libvlc/patches/0013-…patch` applies to `fd814768b` and to `master`
+   (`modules/demux/avformat/demux.c` is identical at both; checked against master `c783406` of
+   2026-10-19 on 2026-11-01). The VLC checkout at `~/github/vlckit-scratch/vlc` has branch
+   `avformat-spu-pcr` = `upstream/master` + the commit, authored `Dave Horsey <dave@cloudunifi.com>`.
+2. Account: https://code.videolan.org/users/sign_in offers "Sign in with GitHub" (also GitLab.com
+   and plain registration). Sign in with the `cloudunifi` GitHub account and accept the GitLab
+   username it proposes.
+3. Fork https://code.videolan.org/videolan/vlc with the Fork button (personal fork:
+   `code.videolan.org/<username>/vlc`). Add an SSH key under Preferences → SSH Keys, or use HTTPS
+   with a personal access token (Preferences → Access Tokens, scope `write_repository`).
+4. Push the branch:
+   ```sh
+   cd ~/github/vlckit-scratch/vlc
+   git remote add fork git@code.videolan.org:<username>/vlc.git
+   git push fork avformat-spu-pcr
+   ```
+   GitLab prints a "create a merge request" link in the push output; otherwise open the fork's
+   Merge requests page and choose source `avformat-spu-pcr`, target `videolan/vlc:master`.
+5. Fill the MR: title and body from `MR.md`, tick "Allow commits from members who can merge",
+   drag the four evidence files into the description. Pick a `Demux` label if the picker offers
+   one; maintainers set labels otherwise.
+6. CI runs on the MR ("CI and discussions should be resolved before a Merge Request can be
+   merged", VLC README). Review comments arrive at the GitHub account's primary email.
+7. Note the MR link here and in the app repository's follow-ups (item 24).
