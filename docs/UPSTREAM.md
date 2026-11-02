@@ -87,6 +87,6 @@ give the track list.
 
 - 2026-11-02: opened as https://code.videolan.org/videolan/vlc/-/merge_requests/10645 (!10645)
   from `cloudunifi/vlc:avformat-spu-pcr`, commit `3dae3dcf`, the four evidence files attached.
-  CI pipeline #749682 started on creation. VLC merges fast-forward only, so the branch must be
+  CI pipeline #749682 (21 jobs) passed in 23 minutes. VLC merges fast-forward only, so the branch must be
   rebased on `master` before merge (the MR page's Rebase button does it server-side; do it when a
   reviewer asks or once review is done, since every rebase reruns the pipeline).
