@@ -20,7 +20,7 @@ diff --git a/modules/demux/avformat/demux.c b/modules/demux/avformat/demux.c
 index 0a4cfbd..3b37b8a 100644
 --- a/modules/demux/avformat/demux.c
 +++ b/modules/demux/avformat/demux.c
-@@ -974,10 +974,22 @@ static int Demux( demux_t *p_demux )
+@@ -974,10 +974,23 @@ static int Demux( demux_t *p_demux )
      if( p_frame->i_dts != VLC_TICK_INVALID && p_track->p_es != NULL )
          p_track->i_pcr = p_frame->i_dts;
  
@@ -32,7 +32,8 @@ index 0a4cfbd..3b37b8a 100644
 +    bool b_av_tracks = false;
 +    for( unsigned i = 0; i < p_sys->i_tracks; i++ )
 +        if( p_sys->tracks[i].p_es != NULL &&
-+            p_sys->tracks[i].es_format.i_cat != SPU_ES )
++            ( p_sys->tracks[i].es_format.i_cat == AUDIO_ES ||
++              p_sys->tracks[i].es_format.i_cat == VIDEO_ES ) )
 +            b_av_tracks = true;
 +
      vlc_tick_t i_ts_max = VLC_TICK_MIN;
@@ -44,7 +45,7 @@ index 0a4cfbd..3b37b8a 100644
              i_ts_max = __MAX( i_ts_max, p_sys->tracks[i].i_pcr );
      }
  
-@@ -985,6 +997,7 @@ static int Demux( demux_t *p_demux )
+@@ -985,6 +998,7 @@ static int Demux( demux_t *p_demux )
      for( unsigned i = 0; i < p_sys->i_tracks; i++ )
      {
          if( p_sys->tracks[i].p_es != NULL &&

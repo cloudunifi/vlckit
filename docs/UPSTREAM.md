@@ -90,3 +90,7 @@ give the track list.
   CI pipeline #749682 (21 jobs) passed in 23 minutes. VLC merges fast-forward only, so the branch must be
   rebased on `master` before merge (the MR page's Rebase button does it server-side; do it when a
   reviewer asks or once review is done, since every rebase reruns the pipeline).
+- 2026-11-05: Steve Lhomme (reviewer, milestone 4.0) asked that the `b_av_tracks` test match its name:
+  the loop now counts only `AUDIO_ES`/`VIDEO_ES` tracks instead of "not `SPU_ES`" (same behaviour in
+  practice: attachment and data streams never get an ES here). Amended commit `83eff610` force-pushed to
+  the MR branch; patch 0013 mirrors it. Thread answered on the MR, left for the reviewer to resolve.
